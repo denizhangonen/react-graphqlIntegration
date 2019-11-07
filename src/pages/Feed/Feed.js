@@ -8,6 +8,7 @@ import Paginator from "../../components/Paginator/Paginator";
 import Loader from "../../components/Loader/Loader";
 import ErrorHandler from "../../components/ErrorHandler/ErrorHandler";
 import "./Feed.css";
+import image from "../../components/Image/Image";
 
 class Feed extends Component {
   state = {
@@ -56,27 +57,28 @@ class Feed extends Component {
     }
     const graphqlQuery = {
       query: `
-      {
-        posts (page:${page}) {
-          posts {
-            _id 
-            title
-            content
-            imageUrl
-            creator {
-              name
+        {
+          posts(page: ${page}) {
+            posts {
+              _id
+              title
+              content
+              imageUrl
+              creator {
+                name
+              }
+              createdAt
             }
+            totalPosts
           }
-          totalPosts
         }
-      }
       `
     };
-    fetch("http://localhost:8080/graphql", {
-      method: "POST",
+    fetch('http://localhost:8080/graphql', {
+      method: 'POST',
       headers: {
-        Authorization: "Bearer " + this.props.token,
-        "Content-Type": "application/json"
+        Authorization: 'Bearer ' + this.props.token,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(graphqlQuery)
     })
@@ -148,39 +150,53 @@ class Feed extends Component {
       editLoading: true
     });
     const formData = new FormData();
-    formData.append("title", postData.title);
-    formData.append("content", postData.content);
     formData.append("image", postData.image);
+    if (this.state.editPost) {
+      formData.append("oldPath", this.state.editPost.imagePath);
+    }
 
-    const graphqlQuery = {
-      query: `
-        mutation {
-          createPost(postInput: {
-              title: "${postData.title}", 
-              content: "${postData.content}", 
-              imageUrl: "test image"
-            }) {
-            _id
-            title
-            content
-            imageUrl
-            creator {
-              name
-            }
-            createdAt
-          }
-        }      
-      `
-    };
-
-    fetch("http://localhost:8080/graphql", {
-      method: "POST",
-      body: JSON.stringify(graphqlQuery),
+    fetch("http://localhost:8080/post-image", {
+      method: "PUT",
       headers: {
-        Authorization: "Bearer " + this.props.token,
-        "Content-Type": "application/json"
-      }
+        Authorization: "Bearer " + this.props.token,        
+      },
+      body: formData
     })
+      .then(res => {
+        return res.json();
+      })
+      .then(fileResData => {
+        const imageUrl = fileResData.filePath;
+        const graphqlQuery = {
+          query: `
+            mutation {
+              createPost(postInput: {
+                  title: "${postData.title}", 
+                  content: "${postData.content}", 
+                  imageUrl: "${imageUrl}"
+                }) {
+                _id
+                title
+                content
+                imageUrl
+                creator {
+                  name
+                }
+                createdAt
+              }
+            }      
+          `
+        };
+
+        return fetch("http://localhost:8080/graphql", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + this.props.token,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(graphqlQuery)
+        });
+      })
       .then(res => {
         return res.json();
       })
@@ -198,7 +214,8 @@ class Feed extends Component {
           title: resData.data.createPost.title,
           content: resData.data.createPost.content,
           creator: resData.data.createPost.creator,
-          createdAt: resData.data.createPost.createdAt
+          createdAt: resData.data.createPost.createdAt,
+          imageUrl: resData.data.createPost.imageUrl
         };
         this.setState(prevState => {
           let updatedPosts = [...prevState.posts];
