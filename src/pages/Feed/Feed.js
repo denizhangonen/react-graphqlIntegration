@@ -74,11 +74,11 @@ class Feed extends Component {
         }
       `
     };
-    fetch('http://localhost:8080/graphql', {
-      method: 'POST',
+    fetch("http://localhost:8080/graphql", {
+      method: "POST",
       headers: {
-        Authorization: 'Bearer ' + this.props.token,
-        'Content-Type': 'application/json'
+        Authorization: "Bearer " + this.props.token,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(graphqlQuery)
     })
@@ -158,7 +158,7 @@ class Feed extends Component {
     fetch("http://localhost:8080/post-image", {
       method: "PUT",
       headers: {
-        Authorization: "Bearer " + this.props.token,        
+        Authorization: "Bearer " + this.props.token
       },
       body: formData
     })
@@ -167,7 +167,7 @@ class Feed extends Component {
       })
       .then(fileResData => {
         const imageUrl = fileResData.filePath;
-        const graphqlQuery = {
+        let graphqlQuery = {
           query: `
             mutation {
               createPost(postInput: {
@@ -188,6 +188,31 @@ class Feed extends Component {
           `
         };
 
+        if (this.state.editPost) {
+          graphqlQuery = {
+            query: `
+            mutation {
+              updatePost(
+                id: "${this.state.editPost._id}"
+                postInput: {
+                  title: "${postData.title}", 
+                  content: "${postData.content}", 
+                  imageUrl: "${imageUrl}"
+                }) {
+                _id
+                title
+                content
+                imageUrl
+                creator {
+                  name
+                }
+                createdAt
+              }
+            }      
+          `
+          };
+        }
+
         return fetch("http://localhost:8080/graphql", {
           method: "POST",
           headers: {
@@ -198,24 +223,30 @@ class Feed extends Component {
         });
       })
       .then(res => {
+        console.log(res);
         return res.json();
       })
       .then(resData => {
+        console.log(resData);
         if (resData.errors && resData.errors[0].status === 422) {
           throw new Error(
             "Validation failed. Make sure the input data is correct!"
           );
         }
         if (resData.errors) {
-          throw new Error("Post creation failed.");
+          throw new Error("Post update failed.");
+        }
+        let resDataField = "createPost";
+        if (this.state.editPost) {
+          resDataField = "updatePost";
         }
         const post = {
-          _id: resData.data.createPost._id,
-          title: resData.data.createPost.title,
-          content: resData.data.createPost.content,
-          creator: resData.data.createPost.creator,
-          createdAt: resData.data.createPost.createdAt,
-          imageUrl: resData.data.createPost.imageUrl
+          _id: resData.data[resDataField]._id,
+          title: resData.data[resDataField].title,
+          content: resData.data[resDataField].content,
+          creator: resData.data[resDataField].creator,
+          createdAt: resData.data[resDataField].createdAt,
+          imageUrl: resData.data[resDataField].imageUrl
         };
         this.setState(prevState => {
           let updatedPosts = [...prevState.posts];
